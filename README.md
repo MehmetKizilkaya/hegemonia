@@ -4,10 +4,10 @@ Türkiye haritası üzerinde ekonomi, siyaset ve savaş MMO — Railway monolith
 
 ## Railway deploy (tek servis)
 
-1. GitHub repo bağla → **yalnızca 1 servis** kullan (`@hegemonia/web` gibi ekstra workspace servislerini sil).
-2. **PostgreSQL** ekle → API servisine `DATABASE_URL` referansını bağla.
-3. Variables:
-   - `JWT_SECRET` = güçlü secret
-   - `NODE_ENV` = `production`
-4. Root Directory: repo kökü (`.`).
-5. Start: `npm start` | Healthcheck: `/health`
+1. GitHub repo bağla → **yalnızca 1 servis** kullan.
+2. **+ New** → **Database** → **PostgreSQL** ekle.
+3. API servisinde **Variables** → **Add Variable**:
+   - `DATABASE_URL` → **Add Reference** → Postgres servisinden `DATABASE_URL` seç
+   - `JWT_SECRET` → rastgele güçlü bir değer
+   - `NODE_ENV` → `production`
+4. **Redeploy** — `/health` → `"database": "connected"` olmalı.

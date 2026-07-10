@@ -1,13 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pool } from './pool.js';
+import { getPool } from './pool.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCHEMA_VERSION = '001_initial';
 const schemaPath = path.resolve(__dirname, '../../db/schema.sql');
 
 export async function migrate() {
+  const pool = getPool();
+  if (!pool) throw new Error('DATABASE_URL is not configured');
   const sql = fs.readFileSync(schemaPath, 'utf8');
   const client = await pool.connect();
 
@@ -46,7 +48,7 @@ if (isDirectRun) {
   migrate()
     .then(() => {
       console.log('[migrate] Done');
-      return pool.end();
+      return getPool()?.end();
     })
     .then(() => process.exit(0))
     .catch((err) => {

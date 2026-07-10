@@ -1,13 +1,26 @@
 import http from 'node:http';
 import { Server as SocketServer } from 'socket.io';
-import { config } from './config.js';
+import { config, assertProductionSecrets } from './config.js';
 import { createApp } from './app.js';
 import { migrate } from './db/migrate.js';
 import { seed } from './db/seed.js';
 import { checkConnection } from './db/pool.js';
 import { verifyToken, findUserById } from './services/authService.js';
 
-async function waitForDatabase(maxAttempts = 15, delayMs = 2000) {
+let dbReady = false;
+
+export function isDatabaseReady() {
+  return dbReady;
+}
+
+async function waitForDatabase(maxAttempts = 20, delayMs = 3000) {
+  if (!config.databaseUrl) {
+    console.error(
+      '[hegemonia] DATABASE_URL missing. Add PostgreSQL in Railway → Variables → DATABASE_URL = ${{Postgres.DATABASE_URL}}',
+    );
+    return false;
+  }
+
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const ok = await checkConnection().catch(() => false);
     if (ok) {
@@ -20,10 +33,35 @@ async function waitForDatabase(maxAttempts = 15, delayMs = 2000) {
   return false;
 }
 
+async function initializeDatabase() {
+  try {
+    assertProductionSecrets();
+  } catch (err) {
+    console.error(`[hegemonia] ${err.message}`);
+    return;
+  }
+
+  const dbOk = await waitForDatabase();
+  if (!dbOk) {
+    console.error('[hegemonia] Database initialization skipped — will retry on next deploy after DATABASE_URL is set');
+    return;
+  }
+
+  try {
+    await migrate();
+    await seed();
+    dbReady = true;
+    console.log('[hegemonia] Database migrate + seed complete');
+  } catch (err) {
+    console.error('[hegemonia] Database initialization failed:', err);
+  }
+}
+
 async function bootstrap() {
   console.log('[hegemonia] Starting API...');
   console.log(`[hegemonia] Environment: ${config.nodeEnv}`);
   console.log(`[hegemonia] Binding ${config.host}:${config.port}`);
+  console.log(`[hegemonia] DATABASE_URL: ${config.databaseUrl ? 'set' : 'NOT SET'}`);
 
   const app = createApp();
   const server = http.createServer(app);
@@ -37,6 +75,9 @@ async function bootstrap() {
   });
 
   io.use(async (socket, next) => {
+    if (!dbReady) {
+      return next(new Error('DB_NOT_READY'));
+    }
     try {
       const token = socket.handshake.auth?.token
         ?? socket.handshake.headers?.authorization?.replace('Bearer ', '');
@@ -84,14 +125,7 @@ async function bootstrap() {
 
   console.log(`[hegemonia] Server listening on ${config.host}:${config.port}`);
 
-  const dbOk = await waitForDatabase();
-  if (!dbOk) {
-    console.error('[hegemonia] Cannot connect to PostgreSQL. Link Postgres and set DATABASE_URL on this service.');
-    process.exit(1);
-  }
-
-  await migrate();
-  await seed();
+  void initializeDatabase();
 
   const shutdown = (signal) => {
     console.log(`[hegemonia] ${signal} received — shutting down`);

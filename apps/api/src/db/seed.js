@@ -1,11 +1,13 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pool } from './pool.js';
+import { getPool } from './pool.js';
 import { REGIONS, FACTORY_TYPES, ITEMS } from '../../db/seeds/regions.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
 export async function seed() {
+  const pool = getPool();
+  if (!pool) throw new Error('DATABASE_URL is not configured');
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -71,7 +73,7 @@ const isDirectRun = process.argv[1] &&
 
 if (isDirectRun) {
   seed()
-    .then(() => pool.end())
+    .then(() => getPool()?.end())
     .then(() => process.exit(0))
     .catch((err) => {
       console.error('[seed] Failed:', err);
