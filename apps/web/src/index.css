@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --color-hegemony-gold: #c9a227;
+  --color-hegemony-dark: #0f1419;
+  --color-hegemony-panel: #1a2332;
+  --color-hegemony-border: #2d3a4f;
+  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  @apply bg-hegemony-dark text-slate-100 antialiased min-h-screen;
+}
+
+#root {
+  @apply min-h-screen;
+}
