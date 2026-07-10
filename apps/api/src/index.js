@@ -6,12 +6,7 @@ import { migrate } from './db/migrate.js';
 import { seed } from './db/seed.js';
 import { checkConnection } from './db/pool.js';
 import { verifyToken, findUserById } from './services/authService.js';
-
-let dbReady = false;
-
-export function isDatabaseReady() {
-  return dbReady;
-}
+import { isDatabaseReady, setDatabaseReady } from './state.js';
 
 async function waitForDatabase(maxAttempts = 20, delayMs = 3000) {
   if (!config.databaseUrl) {
@@ -43,14 +38,14 @@ async function initializeDatabase() {
 
   const dbOk = await waitForDatabase();
   if (!dbOk) {
-    console.error('[hegemonia] Database initialization skipped — will retry on next deploy after DATABASE_URL is set');
+    console.error('[hegemonia] Database initialization skipped — set DATABASE_URL and redeploy');
     return;
   }
 
   try {
     await migrate();
     await seed();
-    dbReady = true;
+    setDatabaseReady(true);
     console.log('[hegemonia] Database migrate + seed complete');
   } catch (err) {
     console.error('[hegemonia] Database initialization failed:', err);
@@ -75,7 +70,7 @@ async function bootstrap() {
   });
 
   io.use(async (socket, next) => {
-    if (!dbReady) {
+    if (!isDatabaseReady()) {
       return next(new Error('DB_NOT_READY'));
     }
     try {
