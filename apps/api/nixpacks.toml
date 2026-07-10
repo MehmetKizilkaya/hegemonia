@@ -1,0 +1,12 @@
+# Railway bu workspace'i ayrı servis olarak algılarsa kök monolith'i çalıştır.
+[phases.setup]
+nixPkgs = ["nodejs_20", "python3", "gcc"]
+
+[phases.install]
+cmds = ["cd ../.. && npm install"]
+
+[phases.build]
+cmds = ["cd ../.. && npm run build"]
+
+[start]
+cmd = "cd ../.. && npm start"

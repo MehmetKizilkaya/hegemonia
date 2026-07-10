@@ -14,14 +14,19 @@ function requireEnv(name, fallback) {
   return value;
 }
 
+const isProduction = (process.env.NODE_ENV ?? 'development') === 'production';
+
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  host: process.env.HOST ?? '0.0.0.0',
   port: Number(process.env.PORT ?? 3001),
-  databaseUrl: requireEnv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/hegemonia'),
+  databaseUrl: isProduction
+    ? requireEnv('DATABASE_URL')
+    : requireEnv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/hegemonia'),
   jwtSecret: requireEnv('JWT_SECRET', 'dev-only-change-in-production'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
-  isProduction: (process.env.NODE_ENV ?? 'development') === 'production',
+  isProduction,
   webDistPath: path.resolve(__dirname, '../../web/dist'),
   bcryptRounds: 12,
   newPlayerShieldDays: 7,

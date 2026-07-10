@@ -7,18 +7,23 @@ import { seed } from './db/seed.js';
 import { checkConnection } from './db/pool.js';
 import { verifyToken, findUserById } from './services/authService.js';
 
+async function waitForDatabase(maxAttempts = 15, delayMs = 2000) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const ok = await checkConnection().catch(() => false);
+    if (ok) {
+      console.log('[hegemonia] PostgreSQL connected');
+      return true;
+    }
+    console.warn(`[hegemonia] PostgreSQL not ready (${attempt}/${maxAttempts})`);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  return false;
+}
+
 async function bootstrap() {
   console.log('[hegemonia] Starting API...');
   console.log(`[hegemonia] Environment: ${config.nodeEnv}`);
-
-  const dbOk = await checkConnection().catch(() => false);
-  if (!dbOk) {
-    console.error('[hegemonia] Cannot connect to PostgreSQL. Check DATABASE_URL.');
-    process.exit(1);
-  }
-
-  await migrate();
-  await seed();
+  console.log(`[hegemonia] Binding ${config.host}:${config.port}`);
 
   const app = createApp();
   const server = http.createServer(app);
@@ -66,21 +71,27 @@ async function bootstrap() {
       if (!channelType || !channelId) return;
       socket.leave(`${channelType}:${channelId}`);
     });
-
-    socket.on('disconnect', () => {
-      // presence tracking — Phase 2
-    });
   });
 
   app.set('io', io);
 
-  server.listen(config.port, () => {
-    console.log(`[hegemonia] Server listening on port ${config.port}`);
-    if (!config.isProduction) {
-      console.log(`[hegemonia] API: http://localhost:${config.port}/api`);
-      console.log(`[hegemonia] Health: http://localhost:${config.port}/health`);
-    }
+  await new Promise((resolve, reject) => {
+    server.listen(config.port, config.host, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
   });
+
+  console.log(`[hegemonia] Server listening on ${config.host}:${config.port}`);
+
+  const dbOk = await waitForDatabase();
+  if (!dbOk) {
+    console.error('[hegemonia] Cannot connect to PostgreSQL. Link Postgres and set DATABASE_URL on this service.');
+    process.exit(1);
+  }
+
+  await migrate();
+  await seed();
 
   const shutdown = (signal) => {
     console.log(`[hegemonia] ${signal} received — shutting down`);
